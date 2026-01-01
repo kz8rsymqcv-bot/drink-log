@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>飲料紀錄</title>
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="飲料紀錄" />
+
+  <!-- iOS 主畫面 icon（吃你現在的 .PNG） -->
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.PNG">
+  <!-- 兼容：如果你哪天又改回小寫 -->
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+
+  <!-- favicon -->
+  <link rel="icon" type="image/png" href="./apple-touch-icon.PNG">
+  <link rel="icon" type="image/png" href="./apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+
+    :root{
+      --main:#8A9A5B;
+      --main-dark:#556B2F;
+      --bg:#F2F4EF;
+      --weekend:#C08282;
+      --today-border:#CFE0B8;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+    }
+    body{
+      font-family:'Noto Sans TC', system-ui, -apple-system, "PingFang TC", "Heiti TC", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      background: var(--bg);
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      overscroll-behavior-y: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar{ display:none; }
+
+    /* 讓主畫面真正一屏：header/stats/月選/日曆/底部 */
+    #app{
+      height: 100svh;
+    }
+
+    /* 日曆縮短：固定 6 列，但單格更小、更緊湊 */
+    .calendar-wrap{
+      flex: 1 1 auto;
+      min-height: 0;
+      display:flex;
+      flex-direction:column;
+    }
+    .calendar-grid{
+      display:grid;
+      grid-template-columns:repeat(7, minmax(0,1fr));
+      gap: 10px;
+      padding: 8px;
+    }
+
+    /* 用 clamp 控制格子高度，避免太高 */
+    .day-cell{
+      height: clamp(40px, 7.2vh, 56px);
+      border-radius: 18px;
+    }
+
+    /* 今天邊框：淡綠色 */
+    .today-ring{
+      outline: 2px solid var(--today-border);
+      outline-offset: -2px;
+    }
+
+    /* Modal：內容可捲，但不會把整個頁面推到可捲 */
+    .modal-sheet{
+      max-height: 85svh;
+      overflow-y:auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 解決 iOS 中文輸入（IME）常見跳字/斷注音問題：不要強迫縮放字體 */
+    input, button{
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" class="max-w-md mx-auto px-4 flex flex-col overflow-hidden"></div>
+
+  <script>
+    /********************
+     * Storage Keys
+     ********************/
+    const KEY_TITLE = "fpj_app_title";
+    const KEY_DATA  = "fpj_offline_data_v2";
+
+    /********************
+     * Options
+     ********************/
+    const iceOptions   = ["正常","少冰","微冰","去冰","常溫","溫","熱","固定"];
+    const sugarOptions = ["全糖","少糖","半糖","微糖","一分","0.5分","無糖","固定"];
+
+    /********************
+     * State
+     ********************/
+    const today = new Date();
+    let state = {
+      currentDate: new Date(2026, 0, 1),
+      selectedDate: null,
+      appTitle: localStorage.getItem(KEY_TITLE) || "一隻肥豬嘉的誕生",
+      isEditingTitle: false,
+      records: safeParse(localStorage.getItem(KEY_DATA)) || {},
+      detailView: null,      // 'good' | 'bad' | null
+    };
+
+    function safeParse(s){
+      try{ return JSON.parse(s); }catch(e){ return null; }
+    }
+
+    function saveData(){
+      localStorage.setItem(KEY_DATA, JSON.stringify(state.records));
+    }
+    function saveTitle(t){
+      state.appTitle = t;
+      localStorage.setItem(KEY_TITLE, t);
+    }
+
+    function formatDateKey(d){
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function sameDay(a,b){
+      return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    }
+
+    function ensureDayArray(dateKey){
+      if(!state.records[dateKey]) state.records[dateKey] = [];
+      return state.records[dateKey];
+    }
+
+    function drinkLabel(drink){
+      const shop = (drink.shop||"").trim();
+      const item = (drink.item||"").trim();
+      const s = drink.sugar || "無糖";
+      const i = drink.ice || "去冰";
+      const base = `${shop}${shop&&item?"-":""}${item}`.trim() || "（未命名）";
+      return `${base}（${s}/${i}）`;
+    }
+
+    /********************
+     * Stats
+     ********************/
+    function calculateStats(){
+      const y = state.currentDate.getFullYear();
+      const m = state.currentDate.getMonth();
+
+      let yTotal=0, yCount=0, mTotal=0, mCount=0;
+      const comboFreq = {};
+      const goodList = [];
+      const badList  = [];
+
+      for(const key of Object.keys(state.records)){
+        const dt = new Date(key);
+        const isYear  = dt.getFullYear() === y;
+        const isMonth = isYear && dt.getMonth() === m;
+
+        for(const drink of (state.records[key]||[])){
+          const price = Number(drink.price || 0);
+
+          if(isYear){ yTotal += price; yCount++; }
+          if(isMonth){ mTotal += price; mCount++; }
+
+          if((drink.shop||"").trim() && (drink.item||"").trim()){
+            const name = `${drink.shop}-${drink.item}`;
+            comboFreq[name] = (comboFreq[name]||0)+1;
+          }
+          if(drink.rating === "good") goodList.push({drink, date:key});
+          if(drink.rating === "bad")  badList.push({drink, date:key});
+        }
+      }
+
+      const topCombos = Object.entries(comboFreq).sort((a,b)=>b[1]-a[1]).slice(0,3);
+      return { yTotal, yCount, mTotal, mCount, topCombos, goodList, badList };
+    }
+
+    /********************
+     * Render
+     ********************/
+    function render(){
+      const app = document.getElementById("app");
+      const stats = calculateStats();
+
+      const year = state.currentDate.getFullYear();
+      const month = state.currentDate.getMonth();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const firstDay = new Date(year, month, 1).getDay();
+
+      let titleHtml = "";
+      if(state.isEditingTitle){
+        titleHtml = `
+          <input id="titleInput" type="text" class="text-xl font-black text-[var(--main)] text-center bg-white rounded-full px-4 py-2 border-2 border-[var(--main)] w-full max-w-[280px] outline-none"
+                 value="${escapeHtml(state.appTitle)}" />
+        `;
+      }else{
+        titleHtml = `
+          <div id="titleDisplay" class="flex items-center gap-2 cursor-pointer active:opacity-60 select-none">
+            <h1 class="text-xl font-black tracking-widest text-[var(--main)]">${escapeHtml(state.appTitle)}</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </div>
+        `;
+      }
+
+      // calendar cells
+      let calendarCells = "";
+      for(let i=0;i<firstDay;i++){
+        calendarCells += `<div></div>`;
+      }
+
+      for(let d=1; d<=daysInMonth; d++){
+        const dateObj = new Date(year, month, d);
+        const key = formatDateKey(dateObj);
+        const list = state.records[key] || [];
+        const count = list.length;
+        const isWeekend = ((firstDay + d - 1) % 7 === 0) || ((firstDay + d - 1) % 7 === 6);
+        const isToday = sameDay(dateObj, today);
+
+        let bgClass = "bg-white/40";
+        if(count===1) bgClass = "bg-[#E1EAD1]";
+        if(count===2) bgClass = "bg-[#FEF5D4]";
+        if(count>=3) bgClass = "bg-[#FEE2E2]";
+
+        const daySum = count>0 ? list.reduce((s,i)=>s+Number(i.price||0),0) : 0;
+
+        calendarCells += `
+          <button data-day="${d}" class="day-cell ${bgClass} ${isToday ? "today-ring" : ""} w-full flex flex-col items-center justify-center border border-white/60 shadow-sm active:scale-95 transition-transform relative">
+            <span class="text-[12px] font-black" style="color:${isWeekend ? 'var(--weekend)' : 'var(--main-dark)'}">${d}</span>
+            ${count>0 ? `<span class="text-[9px] font-bold text-slate-400 leading-none mt-0.5">$${daySum}</span>` : ``}
+          </button>
+        `;
+      }
+
+      // bottom buttons colors (match text)
+      const goodCount = stats.goodList.length;
+      const badCount  = stats.badList.length;
+
+      app.innerHTML = `
+        <!-- Header -->
+        <div class="flex justify-center items-center pt-4 pb-3 shrink-0">
+          ${titleHtml}
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-3 mb-3 shrink-0">
+          <div class="bg-white/80 p-3 rounded-[1.5rem] shadow-sm border border-white text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-[#CD5C5C]/20"></div>
+            <p class="text-[10px] font-black text-[#CD5C5C] mb-1 tracking-widest">年度累計</p>
+            <p class="text-sm font-black text-slate-700">
+              ${stats.yCount} <span class="text-[10px] text-slate-400">杯</span>
+              <span class="text-[#CD5C5C] ml-1">$${stats.yTotal.toLocaleString()}</span>
+            </p>
+          </div>
+
+          <div class="bg-white/80 p-3 rounded-[1.5rem] shadow-sm border border-white text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-[var(--main)]/20"></div>
+            <p class="text-[10px] font-black text-[var(--main)] mb-1 tracking-widest">本月統計</p>
+            <p class="text-sm font-black text-slate-700">
+              ${stats.mCount} <span class="text-[10px] text-slate-400">杯</span>
+              <span class="text-[var(--main-dark)] ml-1">$${stats.mTotal.toLocaleString()}</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Month Selector -->
+        <div class="flex justify-center mb-3 shrink-0">
+          <div class="flex items-center gap-6 bg-white/60 px-6 py-2 rounded-full border border-white/40 shadow-sm">
+            <button id="prevMonth" class="text-[var(--main)] font-black text-lg active:scale-75 transition-transform">〈</button>
+            <p class="font-black text-base tracking-tighter text-[var(--main-dark)] min-w-[88px] text-center">
+              ${year}.${String(month+1).padStart(2,'0')}
+            </p>
+            <button id="nextMonth" class="text-[var(--main)] font-black text-lg active:scale-75 transition-transform">〉</button>
+            <button id="goToday" class="ml-1 px-3 py-1.5 rounded-full bg-white/70 border border-white/60 text-[11px] font-black text-[var(--main-dark)] active:scale-95 transition-transform">今天</button>
+          </div>
+        </div>
+
+        <!-- Calendar -->
+        <div class="calendar-wrap bg-white/95 rounded-[2rem] shadow-sm border border-white mb-3 overflow-hidden">
+          <div class="grid grid-cols-7 px-4 pt-4 pb-1 text-center shrink-0">
+            ${['日','一','二','三','四','五','六'].map((d,i)=>`
+              <div class="text-[10px] font-black" style="color:${(i===0||i===6)?'var(--weekend)':'#A5B997'}">${d}</div>
+            `).join('')}
+          </div>
+
+          <div class="calendar-grid flex-1 min-h-0">
+            ${calendarCells}
+          </div>
+        </div>
+
+        <!-- Bottom -->
+        <div class="shrink-0 space-y-3 pb-3">
+          <!-- Top combos -->
+          <div class="bg-white/70 px-4 py-3 rounded-[1.5rem] border border-white shadow-sm flex items-center gap-3">
+            <div class="bg-[var(--main)] text-white w-11 h-11 rounded-full flex flex-col items-center justify-center shadow-sm shrink-0">
+              <span class="text-[12px] font-black">TOP</span>
+            </div>
+            <div class="flex gap-2 overflow-x-auto no-scrollbar flex-1 items-center">
+              ${
+                stats.topCombos.length
+                ? stats.topCombos.map(([combo,count])=>`
+                    <div class="flex-shrink-0 bg-white px-3 py-2 rounded-xl border border-[#E1EAD1] text-center min-w-[92px]">
+                      <div class="text-[10px] font-black text-[var(--main-dark)] truncate max-w-[92px]">${escapeHtml(combo)}</div>
+                      <div class="text-[8px] font-bold text-slate-300">${count} 次</div>
+                    </div>
+                  `).join('')
+                : `<span class="text-[10px] text-slate-400 italic pl-2">尚未產生排名...</span>`
+              }
+            </div>
+          </div>
+
+          <!-- Good/Bad -->
+          <div class="grid grid-cols-2 gap-3">
+            <button id="openGood" class="bg-white/70 py-4 rounded-[1.2rem] border border-white flex items-center justify-center gap-2 text-[12px] font-black shadow-sm active:scale-95 transition-transform text-[var(--main-dark)]">
+              ${thumbIcon("var(--main-dark)")}
+              <span>讚讚 (${goodCount})</span>
+            </button>
+
+            <button id="openBad" class="bg-white/70 py-4 rounded-[1.2rem] border border-white flex items-center justify-center gap-2 text-[12px] font-black shadow-sm active:scale-95 transition-transform text-[#B56B6B]">
+              ${thumbDownIcon("#B56B6B")}
+              <span>踩雷 (${badCount})</span>
+            </button>
+          </div>
+        </div>
+      `;
+
+      wireMainEvents();
+      if(state.isEditingTitle){
+        const input = document.getElementById("titleInput");
+        input.focus();
+        input.addEventListener("blur", ()=>{
+          const v = (input.value||"").trim();
+          if(v) saveTitle(v);
+          state.isEditingTitle = false;
+          render();
+        }, { once:true });
+      }
+    }
+
+    function escapeHtml(s){
+      return String(s||"")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    /********************
+     * Icons (outline)
+     ********************/
+    function thumbIcon(color){
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"/>
+          <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+        </svg>
+      `;
+    }
+    function thumbDownIcon(color){
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/>
+          <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
+        </svg>
+      `;
+    }
+
+    /********************
+     * Main Events
+     ********************/
+    function wireMainEvents(){
+      const titleDisplay = document.getElementById("titleDisplay");
+      if(titleDisplay){
+        titleDisplay.onclick = ()=>{
+          state.isEditingTitle = true;
+          render();
+        };
+      }
+
+      document.getElementById("prevMonth").onclick = ()=>{
+        state.currentDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth()-1, 1);
+        render();
+      };
+      document.getElementById("nextMonth").onclick = ()=>{
+        state.currentDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth()+1, 1);
+        render();
+      };
+      document.getElementById("goToday").onclick = ()=>{
+        state.currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        render();
+      };
+
+      // day click
+      document.querySelectorAll("[data-day]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const day = Number(btn.getAttribute("data-day"));
+          openEditModal(day);
+        });
+      });
+
+      document.getElementById("openGood").onclick = ()=> openListModal("good");
+      document.getElementById("openBad").onclick  = ()=> openListModal("bad");
+    }
+
+    /********************
+     * Edit Modal (No re-render while typing)
+     ********************/
+    function openEditModal(day){
+      state.selectedDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), day);
+      const dateKey = formatDateKey(state.selectedDate);
+      ensureDayArray(dateKey);
+
+      const modal = document.createElement("div");
+      modal.id = "editModal";
+      modal.className = "fixed inset-0 bg-[var(--main-dark)]/40 backdrop-blur-md z-[100] flex items-end";
+      modal.innerHTML = `
+        <div class="modal-sheet bg-[#FAFBF9] w-full rounded-t-[2.5rem] p-6 pb-
