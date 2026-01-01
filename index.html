@@ -1,445 +1,952 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>飲料紀錄</title>
-    
-    <!-- iOS App 設定 -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="肥豬嘉紀錄">
-    
-    <!-- 🥤 空心飲料杯 Icon (Data URI) -->
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%238A9A5B'/%3E%3Cpath d='M35 25 h30 l-6 50 h-18 z' fill='none' stroke='white' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M45 25 v-8 h10 v8' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='30' y1='25' x2='70' y2='25' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
-    <!-- 標準 Favicon -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M35 25 h30 l-6 50 h-18 z' fill='none' stroke='%238A9A5B' stroke-width='4'/%3E%3C/svg%3E">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="theme-color" content="#F2F4EF" />
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide-static/0.321.0/lucide.css" rel="stylesheet">
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        
-        :root {
-            --weekend-color: #C08282;
-            --main-color: #8A9A5B;
-            --bg-color: #F2F4EF;
-        }
+  <!-- iOS PWA-ish -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="飲料紀錄">
 
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            background-color: var(--bg-color);
-            /* 解決 iOS 底部黑邊 */
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-top: env(safe-area-inset-top);
-            overscroll-behavior-y: none;
-        }
+  <!-- ✅ iOS 主畫面 icon：請在同層放 apple-touch-icon.png (180x180) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <!-- 一般 favicon（可用 svg data uri，桌機瀏覽器 OK） -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M35 25 h30 l-6 50 h-18 z' fill='none' stroke='%238A9A5B' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M45 25 v-8 h10 v8' fill='none' stroke='%238A9A5B' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='30' y1='25' x2='70' y2='25' stroke='%238A9A5B' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 
-        /* 隱藏滾動條 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* 數字鍵盤優化 */
-        input[type="number"]::-webkit-inner-spin-button { display: none; }
+  <title>飲料紀錄</title>
 
-        /* 點擊縮放效果 */
-        .active-scale:active { transform: scale(0.95); transition: transform 0.1s; }
+  <style>
+    :root{
+      --weekend-color:#C08282;
+      --main-color:#8A9A5B;
+      --main-dark:#556B2F;
+      --bg:#F2F4EF;
+      --card:#ffffffcc;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Heiti TC", "Microsoft JhengHei", sans-serif;
+      background:var(--bg);
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      overscroll-behavior-y:none;
+    }
+    input{ font-size:16px; } /* iOS 防止放大 */
+    .wrap{
+      max-width: 430px;
+      margin:0 auto;
+      padding: 0 16px;
+      height: 100vh;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+    .row{ display:flex; align-items:center; justify-content:center; }
+    .header{ padding:16px 0 10px; }
+    .title{
+      display:flex; align-items:center; gap:8px;
+      cursor:pointer;
+      color:var(--main-color);
+      font-weight:900;
+      letter-spacing: .18em;
+      font-size:18px;
+      text-align:center;
+    }
+    .title input{
+      width: 100%;
+      max-width: 290px;
+      border-radius: 999px;
+      border:2px solid var(--main-color);
+      padding: 8px 12px;
+      outline:none;
+      font-weight:900;
+      text-align:center;
+      color:var(--main-color);
+      background:#fff;
+      letter-spacing:.06em;
+    }
 
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 6px;
-        }
-    </style>
+    .cards{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .card{
+      background: var(--card);
+      border:1px solid #fff;
+      border-radius: 22px;
+      padding: 12px;
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .card .bar{ position:absolute; top:0; left:0; right:0; height:4px; opacity:.2; }
+    .card .label{ font-size:10px; font-weight:900; letter-spacing:.2em; margin-bottom:6px;}
+    .card .num{ font-weight:900; font-size:14px; color:#334155; }
+    .card .money{ font-weight:900; margin-left:6px; }
+
+    .monthRow{ display:flex; justify-content:center; margin-bottom:12px; }
+    .pill{
+      display:flex; align-items:center; gap:12px;
+      background: rgba(255,255,255,.6);
+      border:1px solid rgba(255,255,255,.5);
+      border-radius: 999px;
+      padding: 8px 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .btn{
+      border:0;
+      background:transparent;
+      font-weight:900;
+      color:var(--main-color);
+      cursor:pointer;
+      padding: 6px 10px;
+      border-radius: 12px;
+    }
+    .btn:active{ transform: scale(.92); }
+    .monthText{
+      min-width: 110px;
+      text-align:center;
+      font-weight:900;
+      color:var(--main-dark);
+      letter-spacing:-.02em;
+    }
+    .todayBtn{
+      background: rgba(138,154,91,.12);
+      border:1px solid rgba(138,154,91,.2);
+    }
+
+    .calendarBox{
+      background: rgba(255,255,255,.95);
+      border:1px solid #fff;
+      border-radius: 28px;
+      padding: 14px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+      display:flex;
+      flex-direction:column;
+      flex:1;
+      overflow:hidden;
+      margin-bottom:12px;
+    }
+    .dow{ display:grid; grid-template-columns: repeat(7, 1fr); margin-bottom:8px; }
+    .dow div{
+      text-align:center;
+      font-size:10px;
+      font-weight:900;
+      color:#A5B997;
+    }
+    .dow div.weekend{ color: var(--weekend-color); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      overflow:auto;
+      padding-bottom: 8px;
+    }
+    .grid::-webkit-scrollbar{ display:none; }
+    .day{
+      aspect-ratio: 1 / 1;
+      border-radius: 14px;
+      border: .5px solid rgba(255,255,255,.6);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      box-shadow: 0 1px 5px rgba(0,0,0,.03);
+      position:relative;
+    }
+    .day:active{ transform: scale(.95); }
+    .day .d{ font-size:11px; font-weight:900; }
+    .day .sum{ font-size:9px; font-weight:900; color:#94a3b8; margin-top:2px; }
+    .bg0{ background: rgba(255,255,255,.4); }
+    .bg1{ background: #E1EAD1; }
+    .bg2{ background: #FEF5D4; }
+    .bg3{ background: #FEE2E2; }
+
+    .bottom{ padding-bottom: 10px; display:flex; flex-direction:column; gap:12px; }
+    .topBox{
+      background: rgba(255,255,255,.7);
+      border:1px solid #fff;
+      border-radius: 22px;
+      padding: 12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .badge{
+      width: 40px; height: 40px;
+      border-radius: 999px;
+      background: var(--main-color);
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      flex: 0 0 auto;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+    .comboRow{
+      display:flex;
+      gap:8px;
+      overflow:auto;
+      padding-bottom: 4px;
+      flex:1;
+    }
+    .comboRow::-webkit-scrollbar{ display:none; }
+    .combo{
+      background:#fff;
+      border:1px solid #E1EAD1;
+      border-radius: 14px;
+      padding: 8px 10px;
+      min-width: 120px;
+      text-align:center;
+      flex: 0 0 auto;
+    }
+    .combo .name{ font-size:10px; font-weight:900; color:var(--main-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .combo .cnt{ font-size:9px; font-weight:900; color:#cbd5e1; margin-top:2px; }
+
+    .twoBtns{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .bigBtn{
+      background: rgba(255,255,255,.7);
+      border:1px solid #fff;
+      border-radius: 18px;
+      padding: 12px 10px;
+      font-size:12px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .bigBtn:active{ transform: scale(.95); }
+
+    .tools{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .toolBtn{
+      background: rgba(255,255,255,.7);
+      border:1px solid #fff;
+      border-radius: 18px;
+      padding: 12px 10px;
+      font-size:12px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+    .toolBtn:active{ transform: scale(.95); }
+    .muted{ color:#94a3b8; font-weight:900; }
+
+    /* Modal */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(85,107,47,.4);
+      backdrop-filter: blur(10px);
+      z-index:100;
+      display:flex;
+      align-items:flex-end;
+    }
+    .sheet{
+      width:100%;
+      background:#FAFBF9;
+      border-radius: 34px 34px 0 0;
+      max-height: 85vh;
+      overflow:auto;
+      padding: 18px 18px 70px;
+      box-shadow: 0 -10px 30px rgba(0,0,0,.18);
+    }
+    .sheet::-webkit-scrollbar{ display:none; }
+    .sheetTop{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    .sheetTop h3{ margin:0; font-size:20px; font-weight:900; color:var(--main-dark); }
+    .xbtn{
+      width: 34px; height:34px;
+      border-radius: 999px;
+      border:0;
+      background:#fff;
+      color:#cbd5e1;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    }
+    .xbtn:active{ transform: scale(.95); }
+
+    .drinkCard{
+      border-radius: 28px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: .15s;
+    }
+    .drinkCard.exists{
+      background:#fff;
+      border:1px solid #fff;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .drinkCard.empty{
+      background: #F2F4EF;
+      border:2px dashed #DDE4D1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height: 90px;
+    }
+    .addBtn{
+      width:100%;
+      border:0;
+      background:transparent;
+      color:#A5B997;
+      font-weight:900;
+      cursor:pointer;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+    }
+    .topLine{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; }
+    .tag{
+      background: var(--main-color);
+      color:#fff;
+      font-size:10px;
+      font-weight:900;
+      padding: 6px 10px;
+      border-radius: 999px;
+      letter-spacing:.16em;
+    }
+    .iconBtns{ display:flex; gap:8px; align-items:center; }
+    .ib{
+      border:0;
+      background:transparent;
+      padding: 6px;
+      border-radius: 10px;
+      cursor:pointer;
+      color:#cbd5e1;
+    }
+    .ib:active{ transform: scale(.92); }
+    .ib.good.on{ background:#E1EAD1; color: var(--main-color); }
+    .ib.bad.on{ background:#FEE2E2; color: #CD5C5C; }
+
+    .inputs{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .field{
+      border:0;
+      border-radius: 14px;
+      background:#F2F4EF;
+      padding: 12px;
+      font-weight:900;
+      font-size:12px;
+      outline:none;
+    }
+
+    .optTitle{ font-size:10px; font-weight:900; color:#A5B997; margin: 10px 0 6px 6px; }
+    .opts{ display:flex; flex-wrap:wrap; gap:6px; }
+    .chip{
+      border:0;
+      cursor:pointer;
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size:10px;
+      font-weight:900;
+      background:#F2F4EF;
+      color:#A5B997;
+    }
+    .chip.on{
+      background: var(--main-color);
+      color:#fff;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+
+    .priceWrap{ position:relative; margin-top:10px; }
+    .dollar{
+      position:absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-weight:900;
+      color: var(--main-color);
+      font-size: 12px;
+    }
+    .price{
+      width:100%;
+      padding-left: 28px;
+      font-size:14px;
+    }
+
+    .saveBtn{
+      width:100%;
+      border:0;
+      margin-top: 14px;
+      padding: 16px;
+      background: var(--main-dark);
+      color:#fff;
+      font-weight:900;
+      font-size:16px;
+      border-radius: 22px;
+      cursor:pointer;
+      box-shadow: 0 10px 20px rgba(85,107,47,.25);
+    }
+    .saveBtn:active{ transform: scale(.98); }
+
+    /* Detail modal */
+    .overlay2{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(10px);
+      z-index:110;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 24px;
+    }
+    .panel{
+      width:100%;
+      background:#fff;
+      border-radius: 34px;
+      padding: 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.25);
+      max-width: 430px;
+    }
+    .panel h3{
+      margin: 0 0 12px;
+      text-align:center;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+    .list{
+      max-height: 55vh;
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .list::-webkit-scrollbar{ display:none; }
+    .li{
+      background:#F2F4EF;
+      border-radius: 14px;
+      padding: 12px;
+      display:flex;
+      justify-content:space-between;
+      font-weight:900;
+      font-size:12px;
+    }
+    .closeBtn{
+      width:100%;
+      border:0;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--main-dark);
+      color:#fff;
+      font-weight:900;
+      border-radius: 16px;
+      cursor:pointer;
+    }
+    .closeBtn:active{ transform: scale(.98); }
+  </style>
 </head>
+
 <body>
+  <div class="wrap" id="app"></div>
 
-    <div id="app" class="max-w-md mx-auto px-4 h-screen flex flex-col overflow-hidden">
-        <!-- 內容將由 JavaScript 渲染 -->
-    </div>
+  <input id="importFile" type="file" accept="application/json" style="display:none" />
 
-    <script>
-        // --- 初始化狀態 ---
-        const today = new Date();
-        let state = {
-            currentDate: new Date(2026, 0, 1), // 預設 2026 年
-            selectedDate: null,
-            showModal: false,
-            detailView: null,
-            // 讀取標題
-            appTitle: localStorage.getItem('fpj_app_title') || "一隻肥豬嘉的誕生",
-            isEditingTitle: false,
-            // 讀取紀錄
-            records: JSON.parse(localStorage.getItem('fpj_offline_data_v1')) || {}
-        };
+  <script>
+    // -------------------------------
+    // ✅ 離線資料儲存（localStorage）
+    // -------------------------------
+    const LS_DATA_KEY  = "fpj_offline_data_v2";
+    const LS_TITLE_KEY = "fpj_app_title_v2";
 
-        const iceOptions = ["正常", "少冰", "微冰", "去冰", "常溫", "溫", "熱", "固定"];
-        const sugarOptions = ["全糖", "少糖", "半糖", "微糖", "一分", "0.5分", "無糖", "固定"];
+    const iceOptions = ["正常","少冰","微冰","去冰","常溫","溫","熱","固定"];
+    const sugarOptions = ["全糖","少糖","半糖","微糖","一分","0.5分","無糖","固定"];
 
-        // --- 核心功能 ---
+    const today = new Date();
 
-        function save() {
-            localStorage.setItem('fpj_offline_data_v1', JSON.stringify(state.records));
-            render();
+    let state = {
+      currentDate: new Date(2026, 0, 1),
+      selectedDate: null,
+      isEditingTitle: false,
+      appTitle: localStorage.getItem(LS_TITLE_KEY) || "一隻肥豬嘉的誕生",
+      records: JSON.parse(localStorage.getItem(LS_DATA_KEY) || "{}"),
+      detailView: null, // 'good' | 'bad' | null
+    };
+
+    function formatDateKey(date){
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    }
+
+    function save(){
+      localStorage.setItem(LS_DATA_KEY, JSON.stringify(state.records));
+      render();
+    }
+
+    function saveTitle(newTitle){
+      state.appTitle = newTitle;
+      localStorage.setItem(LS_TITLE_KEY, newTitle);
+    }
+
+    // -------------------------------
+    // ✅ 匯出 / 匯入 JSON
+    // -------------------------------
+    function exportJSON(){
+      const payload = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        title: state.appTitle,
+        records: state.records
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const d = new Date();
+      const fname = `drink-log_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.json`;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJSON(){
+      document.getElementById("importFile").click();
+    }
+
+    document.getElementById("importFile").addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if(!file) return;
+
+      try{
+        const text = await file.text();
+        const obj = JSON.parse(text);
+
+        // 允許兩種格式：
+        // A) {title, records}
+        // B) 直接就是 records（舊版純 records）
+        const newTitle = obj?.title;
+        const newRecords = obj?.records || obj;
+
+        if(typeof newRecords !== "object" || Array.isArray(newRecords)){
+          alert("這份 JSON 格式怪怪的，匯入失敗。");
+          return;
         }
 
-        function saveTitle(newTitle) {
-            state.appTitle = newTitle;
-            localStorage.setItem('fpj_app_title', newTitle);
+        state.records = newRecords;
+        localStorage.setItem(LS_DATA_KEY, JSON.stringify(state.records));
+
+        if(typeof newTitle === "string" && newTitle.trim()){
+          saveTitle(newTitle.trim());
         }
 
-        function formatDateKey(date) {
-            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-        }
-
-        function calculateStats() {
-            let mTotal = 0, mCount = 0, yTotal = 0, yCount = 0;
-            const comboFreq = {};
-            const goodList = [];
-            const badList = [];
-
-            Object.keys(state.records).forEach(key => {
-                const date = new Date(key);
-                const isYear = date.getFullYear() === state.currentDate.getFullYear();
-                const isMonth = isYear && date.getMonth() === state.currentDate.getMonth();
-
-                state.records[key].forEach(drink => {
-                    const price = Number(drink.price || 0);
-                    const name = `${drink.shop}-${drink.item}`;
-
-                    if (isYear) { yTotal += price; yCount++; }
-                    if (isMonth) { mTotal += price; mCount++; }
-
-                    if (drink.shop && drink.item) {
-                        comboFreq[name] = (comboFreq[name] || 0) + 1;
-                    }
-                    if (drink.rating === 'good') goodList.push({name, date: key});
-                    if (drink.rating === 'bad') badList.push({name, date: key});
-                });
-            });
-
-            const topCombos = Object.entries(comboFreq)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3);
-
-            return { mTotal, mCount, yTotal, yCount, topCombos, goodList, badList };
-        }
-
-        // --- 渲染 UI ---
-
-        function render() {
-            const app = document.getElementById('app');
-            const stats = calculateStats();
-            
-            // 標題編輯區塊
-            let titleHtml = '';
-            if (state.isEditingTitle) {
-                titleHtml = `<input type="text" id="titleInput" value="${state.appTitle}" class="text-xl font-black text-[#8A9A5B] text-center bg-white rounded-full px-4 py-1 border-2 border-[#8A9A5B] w-full max-w-[260px] outline-none" onblur="finishTitleEdit(this.value)" />`;
-            } else {
-                titleHtml = `
-                    <div onclick="startTitleEdit()" class="flex items-center gap-2 cursor-pointer active:opacity-50">
-                        <h1 class="text-xl font-black tracking-widest text-[#8A9A5B]">${state.appTitle}</h1>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8A9A5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                    </div>
-                `;
-            }
-
-            // 日曆生成
-            const year = state.currentDate.getFullYear();
-            const month = state.currentDate.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const firstDay = new Date(year, month, 1).getDay();
-            
-            let calendarHtml = '';
-            // 空白格
-            for (let i = 0; i < firstDay; i++) {
-                calendarHtml += `<div></div>`;
-            }
-            // 日期格
-            for (let d = 1; d <= daysInMonth; d++) {
-                const dateKey = formatDateKey(new Date(year, month, d));
-                const count = (state.records[dateKey] || []).length;
-                const isWeekend = (firstDay + d - 1) % 7 === 0 || (firstDay + d - 1) % 7 === 6;
-                
-                let bgClass = 'bg-white/40';
-                if (count === 1) bgClass = 'bg-[#E1EAD1]';
-                if (count === 2) bgClass = 'bg-[#FEF5D4]';
-                if (count >= 3) bgClass = 'bg-[#FEE2E2]';
-
-                calendarHtml += `
-                    <div onclick="openModal(${d})" class="${bgClass} aspect-square flex flex-col items-center justify-center rounded-xl border-[0.5px] border-white/50 active-scale shadow-sm relative">
-                        <span class="text-[11px] font-black" style="color: ${isWeekend ? '#C08282' : '#8A9A5B'}">${d}</span>
-                        ${count > 0 ? `<span class="text-[7px] font-bold text-slate-400 mt-0.5">$${state.records[dateKey].reduce((s, i) => s + Number(i.price), 0)}</span>` : ''}
-                    </div>
-                `;
-            }
-
-            app.innerHTML = `
-                <!-- Header -->
-                <div class="flex justify-center items-center py-4 shrink-0">
-                    ${titleHtml}
-                </div>
-
-                <!-- Stats Cards (年度/本月 並排) -->
-                <div class="grid grid-cols-2 gap-3 mb-3 shrink-0">
-                    <div class="bg-white/80 p-3 rounded-[1.5rem] shadow-sm border border-white text-center relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-full h-1 bg-[#CD5C5C]/20"></div>
-                        <p class="text-[10px] font-black text-[#CD5C5C] mb-1 tracking-widest">年度累計</p>
-                        <p class="text-sm font-black text-slate-700">${stats.yCount} <span class="text-[10px] text-slate-400">杯</span> <span class="text-[#CD5C5C] ml-1">$${stats.yTotal.toLocaleString()}</span></p>
-                    </div>
-                    <div class="bg-white/80 p-3 rounded-[1.5rem] shadow-sm border border-white text-center relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-full h-1 bg-[#8A9A5B]/20"></div>
-                        <p class="text-[10px] font-black text-[#8A9A5B] mb-1 tracking-widest">本月統計</p>
-                        <p class="text-sm font-black text-slate-700">${stats.mCount} <span class="text-[10px] text-slate-400">杯</span> <span class="text-[#556B2F] ml-1">$${stats.mTotal.toLocaleString()}</span></p>
-                    </div>
-                </div>
-
-                <!-- Month Selector -->
-                <div class="flex justify-center mb-3 shrink-0">
-                    <div class="flex items-center gap-6 bg-white/60 px-6 py-1.5 rounded-full border border-white/40 shadow-sm">
-                        <button onclick="changeMonth(-1)" class="text-[#8A9A5B] font-bold text-lg active:scale-75 transition-transform">〈</button>
-                        <p class="font-black text-base tracking-tighter text-[#556B2F] min-w-[80px] text-center">
-                            ${year}.${String(month + 1).padStart(2, '0')}
-                        </p>
-                        <button onclick="changeMonth(1)" class="text-[#8A9A5B] font-bold text-lg active:scale-75 transition-transform">〉</button>
-                    </div>
-                </div>
-
-                <!-- Calendar (Scrollable if needed, but fits one screen) -->
-                <div class="bg-white/95 rounded-[2rem] p-4 shadow-sm border border-white mb-3 flex-1 flex flex-col relative overflow-hidden">
-                    <div class="grid grid-cols-7 mb-2 text-center">
-                        ${['日','一','二','三','四','五','六'].map((d, i) => 
-                            `<div class="text-[10px] font-black" style="color: ${i===0||i===6 ? '#C08282' : '#A5B997'}">${d}</div>`
-                        ).join('')}
-                    </div>
-                    <div class="calendar-grid h-full content-start overflow-y-auto no-scrollbar pb-2">
-                        ${calendarHtml}
-                    </div>
-                </div>
-
-                <!-- Bottom Area -->
-                <div class="shrink-0 space-y-3 pb-2">
-                    <!-- Top Combos -->
-                    <div class="bg-white/70 px-4 py-3 rounded-[1.5rem] border border-white relative shadow-sm flex items-center gap-3">
-                        <div class="bg-[#8A9A5B] text-white w-8 h-8 rounded-full flex flex-col items-center justify-center shadow-sm shrink-0">
-                             <span class="text-[8px] font-black">TOP</span>
-                        </div>
-                        <div class="flex gap-2 overflow-x-auto no-scrollbar flex-1 items-center">
-                            ${stats.topCombos.length > 0 ? stats.topCombos.map(([combo, count]) => `
-                                <div class="flex-shrink-0 bg-white px-3 py-1.5 rounded-xl border border-[#E1EAD1] text-center min-w-[80px]">
-                                    <div class="text-[10px] font-black text-[#556B2F] truncate max-w-[80px]">${combo}</div>
-                                    <div class="text-[8px] font-bold text-slate-300">${count} 次</div>
-                                </div>
-                            `).join('') : '<span class="text-[10px] text-slate-400 italic pl-2">尚無排名...</span>'}
-                        </div>
-                    </div>
-
-                    <!-- Good/Bad Buttons -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="openDetail('good')" class="bg-white/70 py-3 rounded-[1.2rem] border border-white flex items-center justify-center gap-2 text-[11px] font-black shadow-sm active-scale">
-                             👍 讚讚 (${stats.goodList.length})
-                        </button>
-                        <button onclick="openDetail('bad')" class="bg-white/70 py-3 rounded-[1.2rem] border border-white flex items-center justify-center gap-2 text-[11px] font-black shadow-sm active-scale">
-                             👎 踩雷 (${stats.badList.length})
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        // --- 互動邏輯 ---
-
-        function startTitleEdit() {
-            state.isEditingTitle = true;
-            render();
-            setTimeout(() => document.getElementById('titleInput').focus(), 50);
-        }
-
-        function finishTitleEdit(val) {
-            if(val.trim()) saveTitle(val.trim());
-            state.isEditingTitle = false;
-            render();
-        }
-
-        function changeMonth(step) {
-            state.currentDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth() + step, 1);
-            render();
-        }
-
-        function openModal(day) {
-            state.selectedDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), day);
-            
-            const dateKey = formatDateKey(state.selectedDate);
-            // 自動補齊空資料
-            if (!state.records[dateKey]) state.records[dateKey] = [];
-            
-            showEditModal();
-        }
-
-        function updateDrink(idx, field, val) {
-            const dateKey = formatDateKey(state.selectedDate);
-            // 確保該索引存在
-            while (state.records[dateKey].length <= idx) {
-                state.records[dateKey].push({ shop: '', item: '', ice: '去冰', sugar: '無糖', price: 0, rating: null });
-            }
-            
-            state.records[dateKey][idx][field] = val;
-            save();
-            showEditModal(); // 重新渲染 Modal 更新 UI
-        }
-
-        function removeDrink(idx) {
-            const dateKey = formatDateKey(state.selectedDate);
-            state.records[dateKey].splice(idx, 1);
-            if (state.records[dateKey].length === 0) delete state.records[dateKey];
-            save();
-            showEditModal();
-        }
-
-        function showEditModal() {
-            const dateKey = formatDateKey(state.selectedDate);
-            const list = state.records[dateKey] || [];
-            
-            // 總是預留一個新增按鈕的位置，除非已經3杯
-            const displayCount = Math.min(list.length + 1, 3);
-            
-            let contentHtml = '';
-            
-            for(let i=0; i<3; i++) {
-                const drink = list[i];
-                const exists = !!drink;
-                
-                // 顯示條件：
-                // 1. 該杯已存在
-                // 2. 或是上一杯已存在 (可新增下一杯)
-                // 3. 第一杯永遠顯示 (如果完全沒資料)
-                const canShow = i === 0 || (list[i-1] && list[i-1].item);
-                
-                if (!canShow) continue;
-
-                if (!exists) {
-                    contentHtml += `
-                        <div class="p-5 rounded-[2rem] bg-[#F2F4EF] border-2 border-dashed border-[#DDE4D1]">
-                            <button onclick="updateDrink(${i}, 'item', '')" class="w-full py-4 text-[#A5B997] font-black text-xs flex flex-col items-center gap-1 active:opacity-60">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
-                                新增第 ${i+1} 杯
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    contentHtml += `
-                        <div class="p-5 rounded-[2rem] bg-white shadow-sm border border-white space-y-3">
-                            <div class="flex justify-between items-center">
-                                <span class="bg-[#8A9A5B] text-white px-3 py-1 rounded-full text-[10px] font-black tracking-widest">NO.${i+1}</span>
-                                <div class="flex gap-2">
-                                    <button onclick="updateDrink(${i}, 'rating', '${drink.rating==='good'?'null':'good'}')" class="p-1.5 rounded-lg ${drink.rating==='good'?'bg-[#E1EAD1] text-[#8A9A5B]':'text-slate-300'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>
-                                    <button onclick="updateDrink(${i}, 'rating', '${drink.rating==='bad'?'null':'bad'}')" class="p-1.5 rounded-lg ${drink.rating==='bad'?'bg-[#FEE2E2] text-[#CD5C5C]':'text-slate-300'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg></button>
-                                    <button onclick="removeDrink(${i})" class="text-slate-200 ml-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="text" placeholder="店家" value="${drink.shop}" onchange="updateDrink(${i}, 'shop', this.value)" class="bg-[#F2F4EF] p-3 rounded-xl text-xs font-bold w-full border-none outline-none focus:ring-1 focus:ring-[#8A9A5B]">
-                                <input type="text" placeholder="品項" value="${drink.item}" onchange="updateDrink(${i}, 'item', this.value)" class="bg-[#F2F4EF] p-3 rounded-xl text-xs font-bold w-full border-none outline-none focus:ring-1 focus:ring-[#8A9A5B]">
-                            </div>
-
-                            <div class="space-y-1">
-                                <p class="text-[10px] font-black text-[#A5B997] ml-1">甜度</p>
-                                <div class="flex flex-wrap gap-1.5">
-                                    ${sugarOptions.map(opt => `<button onclick="updateDrink(${i}, 'sugar', '${opt}')" class="px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-colors ${drink.sugar===opt ? 'bg-[#8A9A5B] text-white shadow-sm' : 'bg-[#F2F4EF] text-[#A5B997]'}">${opt}</button>`).join('')}
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-1">
-                                <p class="text-[10px] font-black text-[#A5B997] ml-1">冰量</p>
-                                <div class="flex flex-wrap gap-1.5">
-                                    ${iceOptions.map(opt => `<button onclick="updateDrink(${i}, 'ice', '${opt}')" class="px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-colors ${drink.ice===opt ? 'bg-[#8A9A5B] text-white shadow-sm' : 'bg-[#F2F4EF] text-[#A5B997]'}">${opt}</button>`).join('')}
-                                </div>
-                            </div>
-
-                            <div class="relative pt-2">
-                                <span class="absolute left-3 top-5 text-[#8A9A5B] font-black text-xs">$</span>
-                                <input type="number" inputMode="decimal" placeholder="金額" value="${drink.price||''}" onchange="updateDrink(${i}, 'price', this.value)" class="w-full bg-[#F2F4EF] pl-8 p-3 rounded-xl text-sm font-black border-none outline-none focus:ring-1 focus:ring-[#8A9A5B]">
-                            </div>
-                        </div>
-                    `;
-                }
-            }
-
-            const modal = document.createElement('div');
-            modal.id = 'editModal';
-            modal.className = 'fixed inset-0 bg-[#556B2F]/40 backdrop-blur-md z-[100] flex items-end animate-fade-in';
-            modal.innerHTML = `
-                <div class="bg-[#FAFBF9] w-full rounded-t-[2.5rem] max-h-[85vh] overflow-y-auto p-6 pb-12 no-scrollbar shadow-2xl animate-slide-up">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-black text-[#556B2F]">${state.selectedDate.getMonth()+1}月${state.selectedDate.getDate()}日</h3>
-                        <button onclick="closeEditModal()" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-300">✕</button>
-                    </div>
-                    <div class="space-y-4">
-                        ${contentHtml}
-                    </div>
-                    <button onclick="closeEditModal()" class="w-full mt-8 py-4 bg-[#556B2F] text-white rounded-[1.5rem] font-black text-base shadow-xl active-scale">儲存紀錄</button>
-                </div>
-            `;
-            
-            // 移除舊的 (如果有)
-            const old = document.getElementById('editModal');
-            if(old) old.remove();
-            
-            document.body.appendChild(modal);
-        }
-
-        function closeEditModal() {
-            const m = document.getElementById('editModal');
-            if(m) m.remove();
-            render(); // 更新主畫面
-        }
-
-        function openDetail(type) {
-            const stats = calculateStats();
-            const list = type === 'good' ? stats.goodList : stats.badList;
-            const title = type === 'good' ? '👍 讚讚清單' : '👎 踩雷紀錄';
-            const color = type === 'good' ? '#A5B997' : '#E2A7A7';
-            
-            const listHtml = list.length > 0 ? list.map(d => `
-                <div class="flex justify-between p-3 bg-[#F2F4EF] rounded-xl text-xs font-black">
-                    <span>${d.name}</span>
-                    <span class="opacity-40">${d.date.slice(5)}</span>
-                </div>
-            `).join('') : `<p class="text-center text-xs text-slate-300 py-6">尚無資料</p>`;
-
-            const modal = document.createElement('div');
-            modal.id = 'detailModal';
-            modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-8';
-            modal.onclick = closeDetailModal;
-            modal.innerHTML = `
-                <div class="bg-white w-full rounded-[2.5rem] p-6 shadow-2xl" onclick="event.stopPropagation()">
-                    <h3 class="text-center font-black mb-4 flex items-center justify-center gap-2" style="color:${color}">${title}</h3>
-                    <div class="max-h-60 overflow-y-auto space-y-2 no-scrollbar">
-                        ${listHtml}
-                    </div>
-                    <button onclick="closeDetailModal()" class="w-full mt-4 py-3 bg-[#556B2F] text-white rounded-xl font-black">關閉</button>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-
-        function closeDetailModal() {
-            const m = document.getElementById('detailModal');
-            if(m) m.remove();
-        }
-
-        // --- 啟動 ---
+        alert("匯入完成 ✅");
         render();
+      }catch(err){
+        console.error(err);
+        alert("JSON 讀取失敗（可能不是合法 JSON）");
+      }
+    });
 
-        // 防止橡皮筋效果
-        document.body.addEventListener('touchmove', function(e) {
-            if(e.target.closest('.no-scrollbar')) return; // 允許內部滾動
-            // e.preventDefault(); // 視情況開啟，可能會鎖死頁面
-        }, { passive: false });
+    function resetAll(){
+      const ok = confirm("要清空所有資料嗎？（此動作不可逆）");
+      if(!ok) return;
+      state.records = {};
+      localStorage.removeItem(LS_DATA_KEY);
+      alert("已清空。你自由了（暫時）😏");
+      render();
+    }
 
-    </script>
+    // -------------------------------
+    // ✅ 統計
+    // -------------------------------
+    function calculateStats(){
+      let mTotal=0, mCount=0, yTotal=0, yCount=0;
+      const comboFreq = {};
+      const goodList = [];
+      const badList = [];
+
+      Object.keys(state.records).forEach(key=>{
+        const date = new Date(key);
+        const isYear = date.getFullYear() === state.currentDate.getFullYear();
+        const isMonth = isYear && date.getMonth() === state.currentDate.getMonth();
+
+        (state.records[key] || []).forEach(drink=>{
+          const price = Number(drink.price || 0);
+          const name = `${drink.shop||""}-${drink.item||""}`.replace(/^-|-$/g,"");
+
+          if(isYear){ yTotal += price; yCount++; }
+          if(isMonth){ mTotal += price; mCount++; }
+
+          if(drink.shop && drink.item){
+            comboFreq[name] = (comboFreq[name] || 0) + 1;
+          }
+          if(drink.rating === "good") goodList.push({name, date:key});
+          if(drink.rating === "bad") badList.push({name, date:key});
+        });
+      });
+
+      const topCombos = Object.entries(comboFreq).sort((a,b)=>b[1]-a[1]).slice(0,3);
+      return {mTotal,mCount,yTotal,yCount,topCombos,goodList,badList};
+    }
+
+    // -------------------------------
+    // ✅ 月份 / 今天
+    // -------------------------------
+    function changeMonth(step){
+      state.currentDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth()+step, 1);
+      render();
+    }
+
+    function goToday(){
+      state.currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      render();
+    }
+
+    // -------------------------------
+    // ✅ 標題編輯
+    // -------------------------------
+    function startTitleEdit(){
+      state.isEditingTitle = true;
+      render();
+      setTimeout(()=>{
+        const el = document.getElementById("titleInput");
+        if(el) el.focus();
+      }, 50);
+    }
+
+    function finishTitleEdit(val){
+      if(val && val.trim()) saveTitle(val.trim());
+      state.isEditingTitle = false;
+      render();
+    }
+
+    // -------------------------------
+    // ✅ Modal：編輯某一天
+    // -------------------------------
+    function openModal(day){
+      state.selectedDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), day);
+      const key = formatDateKey(state.selectedDate);
+      if(!state.records[key]) state.records[key] = [];
+      showEditModal();
+    }
+
+    function updateDrink(idx, field, val){
+      const key = formatDateKey(state.selectedDate);
+      while(state.records[key].length <= idx){
+        state.records[key].push({ shop:"", item:"", ice:"去冰", sugar:"無糖", price:0, rating:null });
+      }
+      if(field === "price"){
+        state.records[key][idx][field] = val === "" ? 0 : Number(val);
+      }else{
+        state.records[key][idx][field] = val;
+      }
+      save();
+      showEditModal();
+    }
+
+    function removeDrink(idx){
+      const key = formatDateKey(state.selectedDate);
+      state.records[key].splice(idx,1);
+      if(state.records[key].length === 0) delete state.records[key];
+      save();
+      showEditModal();
+    }
+
+    function closeEditModal(){
+      const m = document.getElementById("editModal");
+      if(m) m.remove();
+      render();
+    }
+
+    function showEditModal(){
+      const key = formatDateKey(state.selectedDate);
+      const list = state.records[key] || [];
+
+      let html = "";
+
+      for(let i=0;i<3;i++){
+        const drink = list[i];
+        const exists = !!drink;
+        const canShow = i===0 || (list[i-1] && list[i-1].item);
+
+        if(!canShow) continue;
+
+        if(!exists){
+          html += `
+            <div class="drinkCard empty">
+              <button class="addBtn" onclick="updateDrink(${i}, 'item', '')">
+                ${plusSvg()}
+                新增第 ${i+1} 杯
+              </button>
+            </div>
+          `;
+        }else{
+          const goodOn = drink.rating === "good" ? "on" : "";
+          const badOn  = drink.rating === "bad"  ? "on" : "";
+          html += `
+            <div class="drinkCard exists">
+              <div class="topLine">
+                <span class="tag">NO.${i+1}</span>
+                <div class="iconBtns">
+                  <button class="ib good ${goodOn}" onclick="updateDrink(${i}, 'rating', ${drink.rating==="good" ? "null" : "'good'"})">${thumbUpSvg()}</button>
+                  <button class="ib bad ${badOn}" onclick="updateDrink(${i}, 'rating', ${drink.rating==="bad" ? "null" : "'bad'"})">${thumbDownSvg()}</button>
+                  <button class="ib" onclick="removeDrink(${i})">${trashSvg()}</button>
+                </div>
+              </div>
+
+              <div class="inputs">
+                <input class="field" type="text" placeholder="店家" value="${escapeHtml(drink.shop||"")}" onchange="updateDrink(${i}, 'shop', this.value)">
+                <input class="field" type="text" placeholder="品項" value="${escapeHtml(drink.item||"")}" onchange="updateDrink(${i}, 'item', this.value)">
+              </div>
+
+              <div class="optTitle">甜度</div>
+              <div class="opts">
+                ${sugarOptions.map(opt => `
+                  <button class="chip ${drink.sugar===opt?"on":""}" onclick="updateDrink(${i}, 'sugar', '${opt}')">${opt}</button>
+                `).join("")}
+              </div>
+
+              <div class="optTitle">冰量</div>
+              <div class="opts">
+                ${iceOptions.map(opt => `
+                  <button class="chip ${drink.ice===opt?"on":""}" onclick="updateDrink(${i}, 'ice', '${opt}')">${opt}</button>
+                `).join("")}
+              </div>
+
+              <div class="priceWrap">
+                <span class="dollar">$</span>
+                <input class="field price" type="number" inputmode="decimal" placeholder="金額"
+                  value="${drink.price ? drink.price : ""}"
+                  onchange="updateDrink(${i}, 'price', this.value)">
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      const modal = document.createElement("div");
+      modal.id = "editModal";
+      modal.className = "overlay";
+      modal.innerHTML = `
+        <div class="sheet">
+          <div class="sheetTop">
+            <h3>${state.selectedDate.getMonth()+1}月${state.selectedDate.getDate()}日</h3>
+            <button class="xbtn" onclick="closeEditModal()">✕</button>
+          </div>
+
+          ${html}
+
+          <button class="saveBtn" onclick="closeEditModal()">儲存紀錄</button>
+        </div>
+      `;
+
+      const old = document.getElementById("editModal");
+      if(old) old.remove();
+      document.body.appendChild(modal);
+    }
+
+    // -------------------------------
+    // ✅ Detail modal（讚讚 / 踩雷）
+    // -------------------------------
+    function openDetail(type){
+      state.detailView = type;
+      render();
+    }
+    function closeDetail(){
+      state.detailView = null;
+      render();
+    }
+
+    // -------------------------------
+    // ✅ Render
+    // -------------------------------
+    function render(){
+      const app = document.getElementById("app");
+      const stats = calculateStats();
+
+      const year = state.currentDate.getFullYear();
+      const month = state.currentDate.getMonth();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const firstDay = new Date(year, month, 1).getDay();
+
+      // Title
+      let titleHtml = "";
+      if(state.isEditingTitle){
+        titleHtml = `<input id="titleInput" type="text" value="${escapeHtml(state.appTitle)}"
+          onblur="finishTitleEdit(this.value)" />`;
+      }else{
+        titleHtml = `
+          <div class="title" onclick="startTitleEdit()">
+            <span>${escapeHtml(state.appTitle)}</span>
+            ${pencilSvg()}
+          </div>
+        `;
+      }
+
+      // Calendar grid
+      let calendar = "";
+      for(let i=0;i<firstDay;i++){
+        calendar += `<div></div>`;
+      }
+      for(let d=1; d<=daysInMonth; d++){
+        const key = formatDateKey(new Date(year, month, d));
+        const count = (state.records[key] || []).length;
+        const isWeekend = (firstDay + d - 1) % 7 === 0 || (firstDay + d - 1) % 7 === 6;
+
+        let bg = "bg0";
+        if(count === 1) bg = "bg1";
+        if(count === 2) bg = "bg2";
+        if(count >= 3) bg = "bg3";
+
+        const sum = count > 0 ? (state.records[key] || []).reduce((s,i)=>s+Number(i.price||0),0) : 0;
+
+        calendar += `
+          <div class="day ${bg}" onclick="openModal(${d})">
+            <div class="d" style="color:${isWeekend? 'var(--weekend-color)' : 'var(--main-dark)'}">${d}</div>
+            ${count>0 ? `<div class="sum">$${sum}</div>` : ``}
+          </div>
+        `;
+      }
+
+      // Top combos
+      const combosHtml = stats.topCombos.length
+        ? stats.topCombos.map(([combo, count])=>`
+            <div class="combo">
+              <div class="name" title="${escapeHtml(combo)}">${escapeHtml(combo)}</div>
+              <div class="cnt">${count} 次</div>
+            </div>
+          `).join("")
+        : `<div class="muted">尚未產生排名...</div>`;
+
+      app.innerHTML = `
+        <div class="header row">${titleHtml}</div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="bar" style="background:#CD5C5C"></div>
+            <div class="label" style="color:#CD5C5C">年度累計</div>
+            <div class="num">${stats.yCount} <span class="muted" style="font-size:10px">杯</span>
+              <span class="money" style="color:#CD5C5C">$${stats.yTotal.toLocaleString()}</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="bar" style="background:var(--main-color)"></div>
+            <div class="label" style="color:var(--main-color)">本月統計</div>
+            <div class="num">${stats.mCount} <span class="muted" style="font-size:10px">杯</span>
+              <span class="money" style="color:var(--main-dark)">$${stats.mTotal.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="monthRow">
+          <div class="pill">
+            <button class="btn" onclick="changeMonth(-1)">〈</button>
+            <div class="monthText">${year}.${String(month+1).padStart(2,'0')}</div>
+            <button class="btn" onclick="changeMonth(1)">〉</button>
+            <button class="btn todayBtn" onclick="goToday()">今天</button>
+          </div>
+        </div>
+
+        <div class="calendarBox">
+          <div class="dow">
+            <div class="weekend">日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div class="weekend">六</div>
+          </div>
+          <div class="grid">${calendar}</div>
+        </div>
+
+        <div class="bottom">
+          <div class="topBox">
+            <div class="badge">${trophySvg()}<div style="font-size:9px; margin-top:2px;">TOP</div></div>
+            <div class="comboRow">${combosHtml}</div>
+          </div>
+
+          <div class="twoBtns">
+            <button class="bigBtn" onclick="openDetail('good')">👍 讚讚 (${stats.goodList.length})</button>
+            <button class="bigBtn" onclick="openDetail('bad')">👎 踩雷 (${stats.badList.length})</button>
+          </div>
+
+          <div class="tools">
+            <button class="toolBtn" onclick="exportJSON()">${downloadSvg()} 匯出 JSON</button>
+            <button class="toolBtn" onclick="importJSON()">${uploadSvg()} 匯入 JSON</button>
+            <button class="toolBtn" onclick="resetAll()">${boomSvg()} 清空資料</button>
+            <button class="toolBtn" onclick="goToday()">${targetSvg()} 回到本月</button>
+          </div>
+        </div>
+      `;
+
+      // detail modal
+      const existing = document.getElementById("detailModal");
+      if(existing) existing.remove();
+
+      if(state.detailView){
+        const list = state.detailView === "good" ? stats.goodList : stats.badList;
+        const title = state.detailView === "good" ? "讚讚清單" : "踩雷紀錄";
+        const icon = state.detailView === "good" ? "👍" : "👎";
+        const modal = document.createElement("div");
+        modal.id = "detailModal";
+        modal.className = "overlay2";
+        modal.onclick = closeDetail;
+
+        const listHtml = list.length
+          ? list.map(d=>`
+              <div class="li">
+                <span>${escapeHtml(d.name || "(未命名)")}</span>
+                <span style="opacity:.45">${d.date.slice(5)}</span>
+              </div>
+            `).join("")
+          : `<div class="muted" style="text-align:center; padding:18px 0;">尚無資料</div>`;
+
+        modal.innerHTML = `
+          <div class="panel" onclick="event.stopPropagation()">
+            <h3>${icon} ${title}</h3>
+            <div class="list">${listHtml}</div>
+            <button class="closeBtn" onclick="closeDetail()">關閉</button>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+    }
+
+    // -------------------------------
+    // ✅ 小工具：SVG icons + escape
+    // -------------------------------
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function pencilSvg(){ return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8A9A5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
+    function trophySvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17a5 5 0 0 0 5-5V3H7v9a5 5 0 0 0 5 5z"/><path d="M7 4H4a2 2 0 0 0-2 2v1a5 5 0 0 0 5 5"/><path d="M17 4h3a2 2 0 0 1 2 2v1a5 5 0 0 1-5 5"/></svg>`; }
+    function plusSvg(){ return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>`; }
+    function thumbUpSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`; }
+    function thumbDownSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>`; }
+    function trashSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`; }
+    function downloadSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556B2F" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>`; }
+    function uploadSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556B2F" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>`; }
+    function boomSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556B2F" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`; }
+    function targetSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556B2F" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M22 12h-3"/><path d="M12 22v-3"/><path d="M2 12h3"/></svg>`; }
+
+    // -------------------------------
+    // Start
+    // -------------------------------
+    render();
+
+    // 防止 iOS 橡皮筋亂飛（允許 grid/scroll 區域滾）
+    document.body.addEventListener("touchmove", function(e){
+      if(e.target.closest(".grid") || e.target.closest(".sheet") || e.target.closest(".list") || e.target.closest(".comboRow")) return;
+    }, { passive: true });
+  </script>
 </body>
 </html>
