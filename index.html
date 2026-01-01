@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="theme-color" content="#F2F4EF" />
+  <title>飲料紀錄</title>
+
+  <!-- iOS Web App -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="飲料紀錄">
+
+  <!-- ✅ iOS 主畫面 Icon：請在 repo 根目錄放 apple-touch-icon.png (建議 180x180) -->
+  <!-- 用絕對路徑 + 版本號避免快取 -->
+  <link rel="apple-touch-icon" sizes="180x180" href="https://kz8rsymqcv-bot.github.io/drink-log/apple-touch-icon.png?v=3">
+
+  <!-- 一般 favicon（桌機用） -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M35 25 h30 l-6 50 h-18 z' fill='none' stroke='%238A9A5B' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M45 25 v-8 h10 v8' fill='none' stroke='%238A9A5B' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='30' y1='25' x2='70' y2='25' stroke='%238A9A5B' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+
+  <style>
+    :root{
+      --weekend-color:#C08282;
+      --main-color:#8A9A5B;
+      --main-dark:#556B2F;
+      --bg:#F2F4EF;
+      --card:#ffffffcc;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Heiti TC", "Microsoft JhengHei", sans-serif;
+      background:var(--bg);
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      overscroll-behavior-y:none;
+      overflow:hidden;               /* ✅ 背景不給你滑 */
+    }
+    input{ font-size:16px; }        /* iOS 防止放大 */
+
+    .wrap{
+      max-width: 430px;
+      margin:0 auto;
+      padding: 0 16px;
+      height: 100svh;               /* ✅ iOS 真可視高度 */
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+
+    .row{ display:flex; align-items:center; justify-content:center; }
+    .header{ padding:16px 0 10px; }
+
+    .title{
+      display:flex; align-items:center; gap:8px;
+      cursor:pointer;
+      color:var(--main-color);
+      font-weight:900;
+      letter-spacing: .18em;
+      font-size:18px;
+      text-align:center;
+    }
+    .title input{
+      width: 100%;
+      max-width: 290px;
+      border-radius: 999px;
+      border:2px solid var(--main-color);
+      padding: 8px 12px;
+      outline:none;
+      font-weight:900;
+      text-align:center;
+      color:var(--main-color);
+      background:#fff;
+      letter-spacing:.06em;
+    }
+
+    .cards{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .card{
+      background: var(--card);
+      border:1px solid #fff;
+      border-radius: 22px;
+      padding: 12px;
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .card .bar{ position:absolute; top:0; left:0; right:0; height:4px; opacity:.2; }
+    .card .label{ font-size:10px; font-weight:900; letter-spacing:.2em; margin-bottom:6px;}
+    .card .num{ font-weight:900; font-size:14px; color:#334155; }
+    .card .money{ font-weight:900; margin-left:6px; }
+
+    .monthRow{ display:flex; justify-content:center; margin-bottom:12px; }
+    .pill{
+      display:flex; align-items:center; gap:12px;
+      background: rgba(255,255,255,.6);
+      border:1px solid rgba(255,255,255,.5);
+      border-radius: 999px;
+      padding: 8px 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .btn{
+      border:0;
+      background:transparent;
+      font-weight:900;
+      color:var(--main-color);
+      cursor:pointer;
+      padding: 6px 10px;
+      border-radius: 12px;
+    }
+    .btn:active{ transform: scale(.92); }
+    .monthText{
+      min-width: 110px;
+      text-align:center;
+      font-weight:900;
+      color:var(--main-dark);
+      letter-spacing:-.02em;
+    }
+    .todayBtn{
+      background: rgba(138,154,91,.12);
+      border:1px solid rgba(138,154,91,.2);
+    }
+
+    .calendarBox{
+      background: rgba(255,255,255,.95);
+      border:1px solid #fff;
+      border-radius: 28px;
+      padding: 14px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+      display:flex;
+      flex-direction:column;
+      flex:1;
+      min-height: 0;               /* ✅ 讓中間能縮 */
+      overflow:hidden;
+      margin-bottom:12px;
+    }
+    .dow{ display:grid; grid-template-columns: repeat(7, 1fr); margin-bottom:8px; }
+    .dow div{
+      text-align:center;
+      font-size:10px;
+      font-weight:900;
+      color:#A5B997;
+    }
+    .dow div.weekend{ color: var(--weekend-color); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      overflow:auto;               /* ✅ 真正要滾的只有日曆格 */
+      padding-bottom: 8px;
+      min-height: 0;
+    }
+    .grid::-webkit-scrollbar{ display:none; }
+
+    .day{
+      aspect-ratio: 1 / 1;
+      border-radius: 14px;
+      border: .5px solid rgba(255,255,255,.6);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      box-shadow: 0 1px 5px rgba(0,0,0,.03);
+      position:relative;
+    }
+    .day:active{ transform: scale(.95); }
+    .day .d{ font-size:11px; font-weight:900; }
+    .day .sum{ font-size:9px; font-weight:900; color:#94a3b8; margin-top:2px; }
+    .bg0{ background: rgba(255,255,255,.4); }
+    .bg1{ background: #E1EAD1; }
+    .bg2{ background: #FEF5D4; }
+    .bg3{ background: #FEE2E2; }
+
+    .bottom{ padding-bottom: 10px; display:flex; flex-direction:column; gap:12px; }
+
+    .topBox{
+      background: rgba(255,255,255,.7);
+      border:1px solid #fff;
+      border-radius: 22px;
+      padding: 12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .badge{
+      width: 40px; height: 40px;
+      border-radius: 999px;
+      background: var(--main-color);
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      flex: 0 0 auto;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+    .comboRow{
+      display:flex;
+      gap:8px;
+      overflow:auto;
+      padding-bottom: 4px;
+      flex:1;
+      min-height: 0;
+    }
+    .comboRow::-webkit-scrollbar{ display:none; }
+    .combo{
+      background:#fff;
+      border:1px solid #E1EAD1;
+      border-radius: 14px;
+      padding: 8px 10px;
+      min-width: 120px;
+      text-align:center;
+      flex: 0 0 auto;
+    }
+    .combo .name{ font-size:10px; font-weight:900; color:var(--main-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .combo .cnt{ font-size:9px; font-weight:900; color:#cbd5e1; margin-top:2px; }
+
+    .twoBtns{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .bigBtn{
+      background: rgba(255,255,255,.7);
+      border:1px solid #fff;
+      border-radius: 18px;
+      padding: 12px 10px;
+      font-size:12px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      white-space: nowrap;
+    }
+    .bigBtn svg{ vertical-align:-3px; }
+    .bigBtn:active{ transform: scale(.95); }
+
+    /* Modal */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(85,107,47,.4);
+      backdrop-filter: blur(10px);
+      z-index:100;
+      display:flex;
+      align-items:flex-end;
+    }
+    .sheet{
+      width:100%;
+      background:#FAFBF9;
+      border-radius: 34px 34px 0 0;
+      max-height: 85svh;          /* ✅ iOS */
+      overflow:auto;
+      padding: 18px 18px 70px;
+      box-shadow: 0 -10px 30px rgba(0,0,0,.18);
+    }
+    .sheet::-webkit-scrollbar{ display:none; }
+
+    .sheetTop{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    .sheetTop h3{ margin:0; font-size:20px; font-weight:900; color:var(--main-dark); }
+    .xbtn{
+      width: 34px; height:34px;
+      border-radius: 999px;
+      border:0;
+      background:#fff;
+      color:#cbd5e1;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    }
+    .xbtn:active{ transform: scale(.95); }
+
+    .drinkCard{
+      border-radius: 28px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: .15s;
+    }
+    .drinkCard.exists{
+      background:#fff;
+      border:1px solid #fff;
+      box-shadow: 0 1px 6px rgba(0,0,0,.04);
+    }
+    .drinkCard.empty{
+      background: #F2F4EF;
+      border:2px dashed #DDE4D1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height: 90px;
+    }
+    .addBtn{
+      width:100%;
+      border:0;
+      background:transparent;
+      color:#A5B997;
+      font-weight:900;
+      cursor:pointer;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+    }
+    .topLine{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; }
+    .tag{
+      background: var(--main-color);
+      color:#fff;
+      font-size:10px;
+      font-weight:900;
+      padding: 6px 10px;
+      border-radius: 999px;
+      letter-spacing:.16em;
+    }
+    .iconBtns{ display:flex; gap:8px; align-items:center; }
+    .ib{
+      border:0;
+      background:transparent;
+      padding: 6px;
+      border-radius: 10px;
+      cursor:pointer;
+      color:#cbd5e1;
+    }
+    .ib:active{ transform: scale(.92); }
+    .ib.good.on{ background:#E1EAD1; color: var(--main-color); }
+    .ib.bad.on{ background:#FEE2E2; color: #CD5C5C; }
+
+    .inputs{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .field{
+      border:0;
+      border-radius: 14px;
+      background:#F2F4EF;
+      padding: 12px;
+      font-weight:900;
+      font-size:12px;
+      outline:none;
+    }
+
+    .optTitle{ font-size:10px; font-weight:900; color:#A5B997; margin: 10px 0 6px 6px; }
+    .opts{ display:flex; flex-wrap:wrap; gap:6px; }
+    .chip{
+      border:0;
+      cursor:pointer;
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size:10px;
+      font-weight:900;
+      background:#F2F4EF;
+      color:#A5B997;
+    }
+    .chip.on{
+      background: var(--main-color);
+      color:#fff;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+
+    .priceWrap{ position:relative; margin-top:10px; }
+    .dollar{
+      position:absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-weight:900;
+      color: var(--main-color);
+      font-size: 12px;
+    }
+    .price{
+      width:100%;
+      padding-left: 28px;
+      font-size:14px;
+    }
+
+    .saveBtn{
+      width:100%;
+      border:0;
+      margin-top: 14px;
+      padding: 16px;
+      background: var(--main-dark);
+      color:#fff;
+      font-weight:900;
+      font-size:16px;
+      border-radius: 22px;
+      cursor:pointer;
+      box-shadow: 0 10px 20px rgba(85,107,47,.25);
+    }
+    .saveBtn:active{ transform: scale(.98); }
+
+    /* Detail modal */
+    .overlay2{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(10px);
+      z-index:110;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 24px;
+    }
+    .panel{
+      width:100%;
+      background:#fff;
+      border-radius: 34px;
+      padding: 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.25);
+      max-width: 430px;
+    }
+    .panel h3{
+      margin: 0 0 12px;
+      text-align:center;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      color: var(--main-dark);
+    }
+    .panel h3 svg{ vertical-align:-3px; }
+    .list{
+      max-height: 55svh;
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .list::-webkit-scrollbar{ display:none; }
+    .li{
+      background:#F2F4EF;
+      border-radius: 14px;
+      padding: 12px;
+      display:flex;
+      justify-content:space-between;
+      font-weight:900;
+      font-size:12px;
+    }
+    .closeBtn{
+      width:100%;
+      border:0;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--main-dark);
+      color:#fff;
+      font-weight:900;
+      border-radius: 16px;
+      cursor:pointer;
+    }
+    .closeBtn:active{ transform: scale(.98); }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="app"></div>
+
+  <script>
+    // ✅ 離線資料：localStorage
+    const LS_DATA_KEY  = "fpj_offline_data_v3";
+    const LS_TITLE_KEY = "fpj_app_title_v3";
+
+    const iceOptions = ["正常","少冰","微冰","去冰","常溫","溫","熱","固定"];
+    const sugarOptions = ["全糖","少糖","半糖","微糖","一分","0.5分","無糖","固定"];
+
+    const now = new Date();
+
+    let state = {
+      currentDate: new Date(2026, 0, 1),
+      selectedDate: null,
+      isEditingTitle: false,
+      appTitle: localStorage.getItem(LS_TITLE_KEY) || "一隻肥豬嘉的誕生",
+      records: JSON.parse(localStorage.getItem(LS_DATA_KEY) || "{}"),
+      detailView: null, // 'good' | 'bad' | null
+    };
+
+    function formatDateKey(date){
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    }
+
+    function save(){
+      localStorage.setItem(LS_DATA_KEY, JSON.stringify(state.records));
+      render();
+    }
+
+    function saveTitle(newTitle){
+      state.appTitle = newTitle;
+      localStorage.setItem(LS_TITLE_KEY, newTitle);
+    }
+
+    function calculateStats(){
+      let mTotal=0, mCount=0, yTotal=0, yCount=0;
+      const comboFreq = {};
+      const goodList = [];
+      const badList = [];
+
+      Object.keys(state.records).forEach(key=>{
+        const date = new Date(key);
+        const isYear = date.getFullYear() === state.currentDate.getFullYear();
+        const isMonth = isYear && date.getMonth() === state.currentDate.getMonth();
+
+        (state.records[key] || []).forEach(drink=>{
+          const price = Number(drink.price || 0);
+          const name = `${drink.shop||""}-${drink.item||""}`.replace(/^-|-$/g,"");
+
+          if(isYear){ yTotal += price; yCount++; }
+          if(isMonth){ mTotal += price; mCount++; }
+
+          if(drink.shop && drink.item){
+            comboFreq[name] = (comboFreq[name] || 0) + 1;
+          }
+          if(drink.rating === "good") goodList.push({name, date:key});
+          if(drink.rating === "bad") badList.push({name, date:key});
+        });
+      });
+
+      const topCombos = Object.entries(comboFreq).sort((a,b)=>b[1]-a[1]).slice(0,3);
+      return {mTotal,mCount,yTotal,yCount,topCombos,goodList,badList};
+    }
+
+    function changeMonth(step){
+      state.currentDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth()+step, 1);
+      render();
+    }
+
+    function goToday(){
+      state.currentDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      render();
+    }
+
+    function startTitleEdit(){
+      state.isEditingTitle = true;
+      render();
+      setTimeout(()=>{
+        const el = document.getElementById("titleInput");
+        if(el) el.focus();
+      }, 50);
+    }
+
+    function finishTitleEdit(val){
+      if(val && val.trim()) saveTitle(val.trim());
+      state.isEditingTitle = false;
+      render();
+    }
+
+    function openModal(day){
+      state.selectedDate = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), day);
+      const key = formatDateKey(state.selectedDate);
+      if(!state.records[key]) state.records[key] = [];
+      showEditModal();
+    }
+
+    function updateDrink(idx, field, val){
+      const key = formatDateKey(state.selectedDate);
+      while(state.records[key].length <= idx){
+        state.records[key].push({ shop:"", item:"", ice:"去冰", sugar:"無糖", price:0, rating:null });
+      }
+      if(field === "price"){
+        state.records[key][idx][field] = val === "" ? 0 : Number(val);
+      }else{
+        state.records[key][idx][field] = val;
+      }
+      save();
+      showEditModal();
+    }
+
+    function removeDrink(idx){
+      const key = formatDateKey(state.selectedDate);
+      state.records[key].splice(idx,1);
+      if(state.records[key].length === 0) delete state.records[key];
+      save();
+      showEditModal();
+    }
+
+    function closeEditModal(){
+      const m = document.getElementById("editModal");
+      if(m) m.remove();
+      render();
+    }
+
+    function showEditModal(){
+      const key = formatDateKey(state.selectedDate);
+      const list = state.records[key] || [];
+
+      let html = "";
+
+      for(let i=0;i<3;i++){
+        const drink = list[i];
+        const exists = !!drink;
+        const canShow = i===0 || (list[i-1] && list[i-1].item);
+
+        if(!canShow) continue;
+
+        if(!exists){
+          html += `
+            <div class="drinkCard empty">
+              <button class="addBtn" onclick="updateDrink(${i}, 'item', '')">
+                ${plusSvg()}
+                新增第 ${i+1} 杯
+              </button>
+            </div>
+          `;
+        }else{
+          const goodOn = drink.rating === "good" ? "on" : "";
+          const badOn  = drink.rating === "bad"  ? "on" : "";
+          html += `
+            <div class="drinkCard exists">
+              <div class="topLine">
+                <span class="tag">NO.${i+1}</span>
+                <div class="iconBtns">
+                  <button class="ib good ${goodOn}" onclick="updateDrink(${i}, 'rating', ${drink.rating==="good" ? "null" : "'good'"})">${thumbUpSvg()}</button>
+                  <button class="ib bad ${badOn}" onclick="updateDrink(${i}, 'rating', ${drink.rating==="bad" ? "null" : "'bad'"})">${thumbDownSvg()}</button>
+                  <button class="ib" onclick="removeDrink(${i})">${trashSvg()}</button>
+                </div>
+              </div>
+
+              <div class="inputs">
+                <input class="field" type="text" placeholder="店家" value="${escapeHtml(drink.shop||"")}" onchange="updateDrink(${i}, 'shop', this.value)">
+                <input class="field" type="text" placeholder="品項" value="${escapeHtml(drink.item||"")}" onchange="updateDrink(${i}, 'item', this.value)">
+              </div>
+
+              <div class="optTitle">甜度</div>
+              <div class="opts">
+                ${sugarOptions.map(opt => `
+                  <button class="chip ${drink.sugar===opt?"on":""}" onclick="updateDrink(${i}, 'sugar', '${opt}')">${opt}</button>
+                `).join("")}
+              </div>
+
+              <div class="optTitle">冰量</div>
+              <div class="opts">
+                ${iceOptions.map(opt => `
+                  <button class="chip ${drink.ice===opt?"on":""}" onclick="updateDrink(${i}, 'ice', '${opt}')">${opt}</button>
+                `).join("")}
+              </div>
+
+              <div class="priceWrap">
+                <span class="dollar">$</span>
+                <input class="field price" type="number" inputmode="decimal" placeholder="金額"
+                  value="${drink.price ? drink.price : ""}"
+                  onchange="updateDrink(${i}, 'price', this.value)">
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      const modal = document.createElement("div");
+      modal.id = "editModal";
+      modal.className = "overlay";
+      modal.innerHTML = `
+        <div class="sheet">
+          <div class="sheetTop">
+            <h3>${state.selectedDate.getMonth()+1}月${state.selectedDate.getDate()}日</h3>
+            <button class="xbtn" onclick="closeEditModal()">✕</button>
+          </div>
+
+          ${html}
+
+          <button class="saveBtn" onclick="closeEditModal()">儲存紀錄</button>
+        </div>
+      `;
+
+      const old = document.getElementById("editModal");
+      if(old) old.remove();
+      document.body.appendChild(modal);
+    }
+
+    function openDetail(type){
+      state.detailView = type;
+      render();
+    }
+    function closeDetail(){
+      state.detailView = null;
+      render();
+    }
+
+    function render(){
+      const app = document.getElementById("app");
+      const stats = calculateStats();
+
+      const year = state.currentDate.getFullYear();
+      const month = state.currentDate.getMonth();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const firstDay = new Date(year, month, 1).getDay();
+
+      let titleHtml = "";
+      if(state.isEditingTitle){
+        titleHtml = `<input id="titleInput" type="text" value="${escapeHtml(state.appTitle)}"
+          onblur="finishTitleEdit(this.value)" />`;
+      }else{
+        titleHtml = `
+          <div class="title" onclick="startTitleEdit()">
+            <span>${escapeHtml(state.appTitle)}</span>
+            ${pencilSvg()}
+          </div>
+        `;
+      }
+
+      let calendar = "";
+      for(let i=0;i<firstDay;i++){
+        calendar += `<div></div>`;
+      }
+      for(let d=1; d<=daysInMonth; d++){
+        const key = formatDateKey(new Date(year, month, d));
+        const count = (state.records[key] || []).length;
+        const isWeekend = (firstDay + d - 1) % 7 === 0 || (firstDay + d - 1) % 7 === 6;
+
+        let bg = "bg0";
+        if(count === 1) bg = "bg1";
+        if(count === 2) bg = "bg2";
+        if(count >= 3) bg = "bg3";
+
+        const sum = count > 0 ? (state.records[key] || []).reduce((s,i)=>s+Number(i.price||0),0) : 0;
+
+        calendar += `
+          <div class="day ${bg}" onclick="openModal(${d})">
+            <div class="d" style="color:${isWeekend? 'var(--weekend-color)' : 'var(--main-dark)'}">${d}</div>
+            ${count>0 ? `<div class="sum">$${sum}</div>` : ``}
+          </div>
+        `;
+      }
+
+      const combosHtml = stats.topCombos.length
+        ? stats.topCombos.map(([combo, count])=>`
+            <div class="combo">
+              <div class="name" title="${escapeHtml(combo)}">${escapeHtml(combo)}</div>
+              <div class="cnt">${count} 次</div>
+            </div>
+          `).join("")
+        : `<div style="color:#94a3b8; font-weight:900; font-size:12px;">尚未產生排名...</div>`;
+
+      app.innerHTML = `
+        <div class="header row">${titleHtml}</div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="bar" style="background:#CD5C5C"></div>
+            <div class="label" style="color:#CD5C5C">年度累計</div>
+            <div class="num">${stats.yCount} <span style="color:#94a3b8;font-size:10px;font-weight:900;">杯</span>
+              <span class="money" style="color:#CD5C5C">$${stats.yTotal.toLocaleString()}</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="bar" style="background:var(--main-color)"></div>
+            <div class="label" style="color:var(--main-color)">本月統計</div>
+            <div class="num">${stats.mCount} <span style="color:#94a3b8;font-size:10px;font-weight:900;">杯</span>
+              <span class="money" style="color:var(--main-dark)">$${stats.mTotal.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="monthRow">
+          <div class="pill">
+            <button class="btn" onclick="changeMonth(-1)">〈</button>
+            <div class="monthText">${year}.${String(month+1).padStart(2,'0')}</div>
+            <button class="btn" onclick="changeMonth(1)">〉</button>
+            <button class="btn todayBtn" onclick="goToday()">今天</button>
+          </div>
+        </div>
+
+        <div class="calendarBox">
+          <div class="dow">
+            <div class="weekend">日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div class="weekend">六</div>
+          </div>
+          <div class="grid">${calendar}</div>
+        </div>
+
+        <div class="bottom">
+          <div class="topBox">
+            <div class="badge">${trophySvg()}<div style="font-size:9px; margin-top:2px;">TOP</div></div>
+            <div class="comboRow">${combosHtml}</div>
+          </div>
+
+          <div class="twoBtns">
+            <button class="bigBtn" onclick="openDetail('good')">${thumbUpSvg()} 讚讚 (${stats.goodList.length})</button>
+            <button class="bigBtn" onclick="openDetail('bad')">${thumbDownSvg()} 踩雷 (${stats.badList.length})</button>
+          </div>
+        </div>
+      `;
+
+      const existing = document.getElementById("detailModal");
+      if(existing) existing.remove();
+
+      if(state.detailView){
+        const list = state.detailView === "good" ? stats.goodList : stats.badList;
+        const title = state.detailView === "good" ? "讚讚清單" : "踩雷紀錄";
+        const icon = state.detailView === "good" ? thumbUpSvg() : thumbDownSvg();
+
+        const modal = document.createElement("div");
+        modal.id = "detailModal";
+        modal.className = "overlay2";
+        modal.onclick = closeDetail;
+
+        const listHtml = list.length
+          ? list.map(d=>`
+              <div class="li">
+                <span>${escapeHtml(d.name || "(未命名)")}</span>
+                <span style="opacity:.45">${d.date.slice(5)}</span>
+              </div>
+            `).join("")
+          : `<div style="color:#94a3b8; font-weight:900; text-align:center; padding:18px 0;">尚無資料</div>`;
+
+        modal.innerHTML = `
+          <div class="panel" onclick="event.stopPropagation()">
+            <h3>${icon} ${title}</h3>
+            <div class="list">${listHtml}</div>
+            <button class="closeBtn" onclick="closeDetail()">關閉</button>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+    }
+
+    // Helpers
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    // SVG Icons (空心)
+    function pencilSvg(){ return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8A9A5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`; }
+    function trophySvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17a5 5 0 0 0 5-5V3H7v9a5 5 0 0 0 5 5z"/><path d="M7 4H4a2 2 0 0 0-2 2v1a5 5 0 0 0 5 5"/><path d="M17 4h3a2 2 0 0 1 2 2v1a5 5 0 0 1-5 5"/></svg>`; }
+    function plusSvg(){ return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>`; }
+    function thumbUpSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`; }
+    function thumbDownSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>`; }
+    function trashSvg(){ return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`; }
+
+    // Start
+    render();
+  </script>
+</body>
+</html>
